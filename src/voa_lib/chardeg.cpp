@@ -1,129 +1,176 @@
 #include <string>
 
-/** Converts a lat/long string to degrees. 
- * 
- * @param card A C string representing the lat/long in the forms
+/** Converts a lat/long string to degrees.
+ *
+ * @param cardCStr A C string representing the lat/long in the forms
  *             dddXmm'ss", dddXmm, dddX, ddd.dddX, ddd.ddd, or -ddd.ddd
  *             where  X=N or S for latitude
  *                     =E or W for longitude
  *             W longitude is negative
  *             E latitude  is negative
- * 
+ *
  * @param latLon 0 = latitude, 1 = longitude, anything else = error return
  * @param deg A reference to a double to return the data to
- * @param ierr A reference to an integer to return function success
- * 
- * @returns None, see deg and ierr
- * 
+ * @param ierr A reference to an int32_teger to return function success.
+ *
+ * @returns None, uses legacy return architecture...see params deg and ierr
+ *
  * @note This is a direct conversion of CHARDEG in Fortran to C++. This will need to be reworked in the future
  *       to optimize and use full C++ feature set.
  */
-void charDeg(const char *card, int latLon, double &deg, int &ierr)
+void charDeg(const char *cardCStr, int32_t latlon, double &deg, int32_t &ierr)
 {
-      /*
-      DIMENSION DMAX(2) 
-      CHARACTER*(*) CARD,ICH*1
-      DATA DMAX/90.,360./       !  MAX VALUES ALLOWED FOR LAT/LON
-      IERR=0
-      DEG=0
-      MIN=0
-      ISEC=0
-      ISIGN=1
-      IDEC=0
-      IDEL=0                    !  COUNTS # OF DELIMITERS
-      ionce=0
-      ii=0
-      */
+      std::string card;
+      try
+      {
+            card = std::string(cardCStr);
+      } catch(...)
+      {
+            ierr = -9; //BAD VALUE
+      }
 
-      /*
-      DO 100 I=1,20
-      ICH=CARD(I:I)
-      if(ionce.eq.0 .and. ich.eq.' ') go to 100  !  skip leading blanks
-      ionce=1
-      IF(ICH.EQ.' ' .OR. ICH.EQ.',') GO TO 150   !  END OF STRING
-      IF(IDEL.EQ.3) GO TO 80    !  SOMETHING AFTER SECONDS
-      IF(ICH.EQ.'-') GO TO 10   !  - SIGN
-      IF(ICH.EQ.'.') GO TO 20   !  . decimal point
-      IF(ICH.GE.'0' .AND. ICH.LE.'9') GO TO 30    !  0-9 number
-      IDEL=IDEL+1
-      IF(IDEL.EQ.1) GO TO 70    !  1st DELIMITER--CHECK DIRECTION
-      GO TO 99
-      */
+      const double DMAX[2] = {90.0, 360.0}; // Max values for LAT/LON
+      ierr = 0;
+      deg = 0.0;
+      int32_t min = 0;
+      int32_t isec = 0;
+      int32_t isign = 1;
+      int32_t idec = 0;
+      int32_t idel = 0;
+      bool ionce = false;
+      size_t ii = 0;
 
-/*      
-10    IF(ii.NE.0) IERR=-3        !  - MUST be 1st character
-      ISIGN=-1
-      GO TO 99
-      */
+      for (size_t i = 0; i < card.length(); ++i)
+      {
+            char ich = card[i];
 
-/*
-20    IF(IDEC.NE.0) IERR=-4     !  Only 1 decimal point allowed
-      IF(IDEL.NE.0) IERR=-5     !  Must be before any delimiters
-      IDEC=1
-      GO TO 99
-*/
-/*
-30    N=ICHAR(ICH)-ICHAR('0')   !  Convert to a number
-      IF(IDEL-1) 40,50,60
-      */
-/*     
-40    IF(IDEC.NE.0) GO TO 45    !  Fractions
-      DEG=DEG*10. + FLOAT(N)
-      GO TO 99
-*/
+            if ((!ionce) && (ich == ' '))
+            {
+                  continue; // Skip leading spaces
+            }
+            ionce = true;
 
-/*
-45    DEG=DEG + FLOAT(N)/10.**IDEC
-      IDEC=IDEC+1
-      GO TO 99
-*/
+            if ((ich == ' ') || (ich == ','))
+            {
+                  break; // End of string
+            }
 
-/*
-50    MIN=MIN*10 + N
-      IF(MIN.GE.60) IERR=-6     !  BAD minutes
-      GO TO 99
-*/
+            if (idel == 3)
+            {
+                  ierr = -2; // Something after seconds
+                  return;
+            } 
 
-/*
-60    ISEC=ISEC*10 + N
-      IF(ISEC.GE.60) IERR=-7    !  BAD seconds
-      GO TO 99
-*/
-/*
-70    IF(LATLON.NE.0) GO TO 75  !  LONGITUDE
-      IF(ICH.EQ.'n') ICH='N'
-      IF(ICH.EQ.'s') ICH='S'
-      IF(ICH.NE.'N' .AND. ICH.NE.'S') IERR=-10   !  BAD DIRECTION
-      IF(ICH.EQ.'S') ISIGN=-ISIGN
-      GO TO 99
-*/
-/*
-75    IF(ICH.EQ.'e') ICH='E'
-      IF(ICH.EQ.'w') ICH='W'
-      IF(ICH.NE.'E' .AND. ICH.NE.'W') IERR=-11   !  BAD DIRECTION
-      IF(ICH.EQ.'W') ISIGN=-ISIGN
-      GO TO 99
-*/
-/*
-80    IERR=-2                   !  SOMETHING AFTER SECONDS DELIMITER
-*/
-/*
-99    IF(IERR.LT.0) RETURN
-      ii=ii+1
-*/
-/*
-100   CONTINUE
-      IERR=-8          !  Can't be this long of a character string
-      RETURN
-*/
+            if (ich == '-')
+            {
+                  if (ii != 0)
+                  {
+                        ierr = -3; // '-' must be first
+                        return;
+                  } 
+                  isign = -1;
+                  continue;
+            }
 
-/*
-150   DEG=DEG + FLOAT(MIN)/60. + FLOAT(ISEC)/3600.
-      IF(DEG.GT.DMAX(LATLON+1)) IERR=-9    !  BAD VALUE
-      if(LATLON.eq.1 .and. DEG.gt.180.) DEG=DEG-360.
-      DEG=DEG*ISIGN
-      RETURN
-      END
-*/
+            if (ich == '.')
+            {
+                  if (idec != 0)
+                  {
+                        ierr = -4; // Only one decimal point allowed
+                        return;
+                  } 
 
+                  if (idel != 0)
+                  {
+                        ierr = -5; // Must be before delimiters
+                        return;
+                  } 
+
+                  idec = 1;
+                  continue;
+            }
+
+            if (std::isdigit(ich))
+            {
+                  int32_t n = ich - '0';
+                  if (idel == 0)
+                  {
+                        if (idec == 0)
+                        {
+                              deg = deg * 10.0 + n;
+                        }
+                        else
+                        {
+                              deg += n / pow(10.0, idec);
+                              idec++;
+                        }
+                  }
+                  else if (idel == 1)
+                  {
+                        min = min * 10 + n;
+                        if (min >= 60)
+                        {
+                              ierr = -6;
+                              return;
+                        }
+                  }
+                  else if (idel == 2)
+                  {
+                        isec = isec * 10 + n;
+                        if (isec >= 60)
+                        {
+                              ierr = -7;
+                              return;
+                        }
+                  }
+                  continue;
+            }
+
+            idel++;
+            if (idel == 1)
+            {
+                  // Direction check
+                  if (latlon == 0)
+                  {
+                        if ((ich == 'N') || (ich == 'n'))
+                        {
+                              continue;
+                        }  
+                        if ((ich == 'S') || (ich == 's'))
+                        {
+                              isign = -isign;
+                              continue;
+                        }
+                        ierr = -10;
+                        return;
+                  }
+                  else
+                  {
+                        if ((ich == 'E') || (ich == 'e'))
+                        {
+                              continue;
+                        }  
+                        if ((ich == 'W') || (ich == 'w'))
+                        {
+                              isign = -isign;
+                              continue;
+                        }
+                        ierr = -11;
+                        return;
+                  }
+            }
+      }
+
+      deg += (static_cast<double>(min) / 60.0) + (static_cast<double>(isec) / 3600.0);
+      if (deg > DMAX[latlon])
+      {
+            ierr = -9; //Over size
+            return;
+      }
+      if (latlon == 1 && deg > 180.0)
+      {
+            deg -= 360.0;
+      }
+            
+      deg *= isign;
 }
